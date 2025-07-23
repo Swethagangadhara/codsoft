@@ -1,0 +1,43 @@
+import pandas as pd
+
+# Load the dataset
+df = pd.read_csv("fraudTest.csv")
+
+# Display the first few rows
+display(df.head())
+# Drop irrelevant columns
+df = df.drop(['Unnamed: 0', 'trans_date_trans_time', 'cc_num', 'merchant', 'category', 'first', 'last', 'street', 'city', 'state', 'zip', 'lat', 'long', 'city_pop', 'job', 'dob'], axis=1)
+
+# Handle missing values (if any) - for simplicity, we will drop rows with missing values
+df.dropna(inplace=True)
+
+# Encode categorical features
+df = pd.get_dummies(df, columns=['gender'])
+
+# Separate features and target variable
+x = df.drop('is_fraud', axis=1)
+y = df['is_fraud']
+
+# Scale numerical features
+from sklearn.preprocessing import StandardScaler
+scaler = StandardScaler()
+X = scaler.fit_transform(df["is_fraud"].values.reshape(-1, 1))
+
+display(X[:5])
+display(y.head())
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+
+# Split the data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+
+# Initialize and train the Random Forest model
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
+from sklearn.metrics import classification_report
+
+# Predict on the test set
+y_pred = model.predict(X_test)
+
+# Generate classification report
+print(classification_report(y_test, y_pred))
