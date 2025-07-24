@@ -1,0 +1,78 @@
+import pandas as pd
+
+train_df = pd.read_csv("/content/train_data.txt", sep=':::', names=['ID', 'title', 'genre', 'description'], engine='python')
+test_df = pd.read_csv("/content/test_data.txt", sep=':::', names=['ID', 'title', 'description'], engine='python')
+test_solution_df = pd.read_csv("/content/test_data_solution.txt", sep=':::', names=['ID', 'title', 'genre', 'description'], engine='python')
+
+display(train_df.head())
+display(test_df.head())
+display(test_solution_df.head())
+import re
+import nltk
+import string
+from nltk.corpus import stopwords
+from nltk.stem import LancasterStemmer
+
+# Download necessary NLTK data (if not already downloaded)
+try:
+    stopwords = stopwords.words('english')
+except LookupError:
+    nltk.download('stopwords')
+    stopwords = stopwords.words('english')
+stemmer = LancasterStemmer()
+
+# Text cleaning function
+def clean_text(text):
+    text = re.sub(r'[^a-zA-Z0-9\s]', '', text) # Remove special characters
+    text = text.lower() # Convert to lowercase
+    text = [word for word in text.split() if word not in stopwords] # Remove stopwords
+    text = [stemmer.stem(word) for word in text] # Stemming
+    return ' '.join(text)
+
+# Apply text cleaning to descriptions
+train_df['cleaned_description'] = train_df['description'].apply(clean_text)
+test_df['cleaned_description'] = test_df['description'].apply(clean_text)
+
+display(train_df[['description', 'cleaned_description']].head())
+display(test_df[['description', 'cleaned_description']].head())
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+tfidf_vectorizer = TfidfVectorizer(max_features=10000)
+X_train = tfidf_vectorizer.fit_transform(train_df['cleaned_description'])
+X_test = tfidf_vectorizer.transform(test_df['cleaned_description'])
+
+display(X_train)
+display(X_test)
+from sklearn.linear_model import LogisticRegression
+
+# Instantiate a Logistic Regression model
+model = LogisticRegression()
+
+# Train the model
+model.fit(X_train, train_df['genre'])
+# Filter test_df to include only IDs present in test_solution_df
+test_df_filtered = test_df[test_df['ID'].isin(test_solution_df['ID'])]
+
+# Get the indices of the filtered rows in the original test_df
+filtered_indices = test_df_filtered.index
+
+# Filter X_test using the identified indices
+X_test_filtered = X_test[filtered_indices]
+
+# Align test_solution_df with the filtered test_df based on 'ID'
+aligned_test_solution_df = test_solution_df.set_index('ID').loc[test_df_filtered['ID']].reset_index()
+
+# Predict on the filtered test data
+predictions = model.predict(X_test_filtered)
+
+# Retrieve the true genre labels from the aligned test_solution_df
+true_genres = aligned_test_solution_df['genre']
+
+# Generate classification report
+print("Classification Report:")
+print(classification_report(true_genres, predictions))
+
+# Calculate and print the overall accuracy score
+accuracy = accuracy_score(true_genres, predictions)
+print("\nAccuracy:")
+print(accuracy)
